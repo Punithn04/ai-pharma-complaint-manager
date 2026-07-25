@@ -19,11 +19,23 @@ const chatSlice = createSlice({
   name: "chat",
   initialState,
   reducers: {
-    resetSession: (state) => {
-      state.sessionId = nanoid();
-      state.messages = initialState.messages;
-      state.status = "idle";
-      state.error = null;
+    // Starts a brand-new chat session. When called with a saved complaint id
+    // (after Save Complaint), it also clears the prior conversation log and
+    // greets with a confirmation instead of the generic welcome message.
+    resetSession: {
+      prepare: (savedId) => ({ payload: savedId ?? null }),
+      reducer: (state, action) => {
+        state.sessionId = nanoid();
+        state.messages = action.payload
+          ? [{
+              role: "assistant",
+              content: `✅ Complaint #${action.payload} saved successfully. ` +
+                "Starting a new complaint — describe it or upload a document to begin.",
+            }]
+          : initialState.messages;
+        state.status = "idle";
+        state.error = null;
+      },
     },
   },
   extraReducers: (builder) => {

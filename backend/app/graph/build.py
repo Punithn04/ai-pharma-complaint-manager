@@ -20,6 +20,8 @@ def build_graph():
     g.add_node("edit_complaint", nodes.edit_node)
     g.add_node("extract_document", nodes.document_node)
     g.add_node("assess_risk", nodes.assess_risk_node)
+    g.add_node("summarize_complaint", nodes.summarize_node)
+    g.add_node("check_completeness", nodes.check_completeness_node)
     g.add_node("answer_question", nodes.answer_node)
     g.add_node("respond", nodes.respond_node)
 
@@ -37,7 +39,9 @@ def build_graph():
     g.add_edge("log_complaint", "assess_risk")
     g.add_edge("edit_complaint", "assess_risk")
     g.add_edge("extract_document", "assess_risk")
-    g.add_edge("assess_risk", "respond")
+    g.add_edge("assess_risk", "summarize_complaint")
+    g.add_edge("summarize_complaint", "check_completeness")
+    g.add_edge("check_completeness", "respond")
     g.add_edge("respond", END)
     g.add_edge("answer_question", END)
 

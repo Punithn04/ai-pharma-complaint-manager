@@ -20,8 +20,8 @@ const EMPTY = {
 const initialState = {
   fields: { ...EMPTY },
   changedFields: [], // highlighted in the UI after the latest turn
+  missingFields: [], // mandatory fields still empty — flagged by check_completeness
   duplicateOf: null,
-  saved: null, // saved complaint id
 };
 
 // The agent owns the form. Merge returned fields on top of what we have so a
@@ -30,8 +30,8 @@ const initialState = {
 function applyAgentResult(state, payload) {
   state.fields = { ...state.fields, ...payload.form };
   state.changedFields = payload.changed_fields || [];
+  state.missingFields = payload.missing_fields || [];
   state.duplicateOf = payload.duplicate_of ?? null;
-  state.saved = null;
 }
 
 const complaintSlice = createSlice({
@@ -41,11 +41,8 @@ const complaintSlice = createSlice({
     resetForm: (state) => {
       state.fields = { ...EMPTY };
       state.changedFields = [];
+      state.missingFields = [];
       state.duplicateOf = null;
-      state.saved = null;
-    },
-    markSaved: (state, action) => {
-      state.saved = action.payload;
     },
   },
   extraReducers: (builder) => {
@@ -57,5 +54,5 @@ const complaintSlice = createSlice({
   },
 });
 
-export const { resetForm, markSaved } = complaintSlice.actions;
+export const { resetForm } = complaintSlice.actions;
 export default complaintSlice.reducer;

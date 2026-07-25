@@ -16,6 +16,7 @@ def save_complaint(req: SaveComplaintRequest, db: Session = Depends(get_db)) -> 
     complaint = Complaint(
         session_id=req.session_id,
         risk_assessment=req.risk.model_dump(),
+        summary=req.summary,
         **form,
     )
     db.add(complaint)

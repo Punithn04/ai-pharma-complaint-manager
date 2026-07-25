@@ -2,20 +2,23 @@
 
 Flow:
     START -> router --(intent)--> log_complaint  ─┐
-                               -> extract_document ┼-> assess_risk -> respond -> END
+                               -> extract_document ┼-> assess_risk -> check_completeness -> respond -> END
                                -> edit_complaint  ─┘
-                               -> answer_question ----------------------------> END
+                               -> answer_question ------------------------------------------------> END
 
 Every mutation node returns a *delta* on the `form` channel. The merge reducer
 in state.py folds it into the running form, so edits preserve untouched fields.
 `assess_risk` always runs after a mutation, so the risk panel is re-reasoned on
 every log AND every edit — exactly the behaviour shown in the demo video.
+`check_completeness` then flags any mandatory field still missing so `respond`
+can ask the user for it directly in the chat, instead of leaving the form
+silently blank.
 """
 from __future__ import annotations
 
 import json
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from ..config import settings
 from . import prompts
@@ -37,6 +40,19 @@ FIELD_LABELS = {
     "priority": "Priority",
 }
 ALLOWED_FIELDS = set(FIELD_LABELS)
+
+# Fields a QMS record cannot go to investigation without. Initial_severity and
+# priority are excluded — those are reasoned by assess_risk, not user-supplied.
+MANDATORY_FIELDS = [
+    "complaint_source",
+    "product_name",
+    "batch_lot_number",
+    "manufacturing_date",
+    "expiry_date",
+    "quantity_affected",
+    "complaint_type",
+    "detailed_description",
+]
 
 
 def _last_user_text(state: dict) -> str:
@@ -77,11 +93,15 @@ def router_node(state: dict) -> dict:
     has_form = bool(state.get("form"))
 
     # Heuristic fast-path: cheap and robust for the small routing model.
+    # Kept narrow and correction-specific — a broad catch-all like a bare
+    # "not " would misroute ordinary descriptive sentences ("did not receive
+    # a replacement") into edits.
     lowered = text.lower()
     if has_form and any(
         kw in lowered
-        for kw in ("sorry", "actually", "correction", "change", "update",
-                   "it should be", "the batch", "instead", "not ")
+        for kw in ("sorry", "actually", "correction", "should be",
+                   "instead of", "instead,", "the batch is", "the batch number",
+                   "change it to", "change the", "update the", "correct the")
     ):
         return {"intent": "edit"}
 
@@ -140,20 +160,48 @@ def assess_risk_node(state: dict) -> dict:
 
 
 # --------------------------------------------------------------------------- #
+# Complaint summary (bonus tool)
+# --------------------------------------------------------------------------- #
+def summarize_node(state: dict) -> dict:
+    form = state.get("form") or {}
+    if not form:
+        return {}
+    user = f"Current complaint:\n{json.dumps(form, indent=2)}"
+    parsed, _ = structured_call(settings.groq_extraction_model, prompts.SUMMARIZE_SYSTEM, user)
+    summary = parsed.get("summary") if isinstance(parsed, dict) else None
+    if not summary or not str(summary).strip():
+        return {}
+    return {"summary": str(summary).strip()}
+
+
+# --------------------------------------------------------------------------- #
 # Q&A
 # --------------------------------------------------------------------------- #
 def answer_node(state: dict) -> dict:
     text = _last_user_text(state)
     form = json.dumps(state.get("form", {}), indent=2)
     llm = get_llm(settings.groq_fast_model)
-    from langchain_core.messages import HumanMessage as HM, SystemMessage as SM
 
     resp = llm.invoke([
-        SM(content=prompts.ANSWER_SYSTEM),
-        HM(content=f"Current complaint form:\n{form}\n\nQuestion: {text}"),
+        SystemMessage(content=prompts.ANSWER_SYSTEM),
+        HumanMessage(content=f"Current complaint form:\n{form}\n\nQuestion: {text}"),
     ])
     reply = resp.content if isinstance(resp.content, str) else str(resp.content)
     return {"reply": reply, "messages": [AIMessage(content=reply)]}
+
+
+# --------------------------------------------------------------------------- #
+# Completeness checker (bonus tool)
+# --------------------------------------------------------------------------- #
+def check_completeness_node(state: dict) -> dict:
+    """Flag mandatory fields still missing after extraction/edit, so `respond`
+    can ask the user for them directly instead of leaving the form silently
+    incomplete."""
+    form = state.get("form") or {}
+    if not form:
+        return {"missing_fields": []}
+    missing = [f for f in MANDATORY_FIELDS if not str(form.get(f) or "").strip()]
+    return {"missing_fields": missing}
 
 
 # --------------------------------------------------------------------------- #
@@ -163,6 +211,7 @@ def respond_node(state: dict) -> dict:
     intent = state.get("intent", "log")
     changed = state.get("changed_fields", []) or []
     risk = state.get("risk", {}) or {}
+    missing = state.get("missing_fields", []) or []
     labels = [FIELD_LABELS.get(f, f) for f in changed]
 
     if not changed:
@@ -184,5 +233,13 @@ def respond_node(state: dict) -> dict:
         risk_bits.append(f"recommended action: {risk['next_action']}")
     tail = f" Risk assessment — {'; '.join(risk_bits)}." if risk_bits else ""
 
-    reply = head + tail
+    missing_tail = ""
+    if missing:
+        missing_labels = [FIELD_LABELS.get(f, f) for f in missing]
+        missing_tail = (
+            f"\n\n⚠️ A few required fields are still empty — please tell me: "
+            f"{', '.join(missing_labels)}."
+        )
+
+    reply = head + tail + missing_tail
     return {"reply": reply, "messages": [AIMessage(content=reply)]}

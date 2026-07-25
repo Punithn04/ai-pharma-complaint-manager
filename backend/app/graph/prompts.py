@@ -77,6 +77,15 @@ patient safety on a distributed batch is Critical; cosmetic/packaging issues are
 usually Minor/Major.
 """
 
+SUMMARIZE_SYSTEM = """\
+You are summarizing a pharmaceutical customer complaint for a QA reviewer who
+will triage it. Write ONE concise paragraph (2-4 sentences) covering: what was
+reported, on which product/batch, and any notable severity or safety signal.
+Synthesize the fields into a readable narrative — do not just list them back.
+
+Respond with JSON: {"summary": "<the paragraph>"}
+"""
+
 ANSWER_SYSTEM = """\
 You are the AIVOA complaint intake assistant. Answer the user's question about the
 current complaint clearly and briefly. You may use the provided form JSON as context.

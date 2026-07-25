@@ -50,4 +50,6 @@ class ComplaintState(TypedDict, total=False):
     # Per-invocation outputs.
     reply: str
     changed_fields: list
+    missing_fields: list
+    summary: str
     model_used: str

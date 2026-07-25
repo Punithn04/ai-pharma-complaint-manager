@@ -54,6 +54,8 @@ def run_agent(
     intent = result.get("intent", "log")
     reply = result.get("reply", "")
     changed = result.get("changed_fields", []) or []
+    missing = result.get("missing_fields", []) or []
+    summary = result.get("summary") or None
     model_used = result.get("model_used")
     latency_ms = int((time.perf_counter() - started) * 1000)
 
@@ -65,7 +67,10 @@ def run_agent(
         intent=intent,
         model=model_used,
         latency_ms=latency_ms,
-        output_json={"form": form, "risk": risk, "changed_fields": changed},
+        output_json={
+            "form": form, "risk": risk,
+            "changed_fields": changed, "missing_fields": missing, "summary": summary,
+        },
     ))
     db.commit()
 
@@ -76,5 +81,7 @@ def run_agent(
         "form": form,
         "risk": risk,
         "changed_fields": changed,
+        "missing_fields": missing,
+        "summary": summary,
         "duplicate_of": duplicate_of,
     }

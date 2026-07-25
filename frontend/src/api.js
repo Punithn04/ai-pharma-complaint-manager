@@ -29,10 +29,12 @@ export const api = {
     return fetch("/api/upload", { method: "POST", body: fd }).then(handle);
   },
 
-  saveComplaint: (sessionId, form, risk) =>
+  saveComplaint: (sessionId, form, risk, summary) =>
     fetch("/api/complaints", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ session_id: sessionId, form, risk }),
+      body: JSON.stringify({ session_id: sessionId, form, risk, summary }),
     }).then(handle),
+
+  listComplaints: () => fetch("/api/complaints").then(handle),
 };

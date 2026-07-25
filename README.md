@@ -15,11 +15,11 @@ Built for the AIVOA Round-1 Full-Stack assessment.
 
 | Tool | How to trigger | What happens |
 |------|----------------|--------------|
-| **1. Log complaint** | Type: *"Apollo Pharmacy reported discolored capsules in Amoxicillin capsules 500 mg"* | Agent extracts fields → fills the form → reasons the risk assessment |
-| **2. Edit complaint** | Type: *"Sorry, the batch number is BMX24602 and the affected quantity is 48 capsules"* | Agent updates **only** those fields, **preserves everything else**, re-assesses risk |
+| **1. Log complaint** | Type a free-text complaint, e.g. *"Apollo Pharmacy reported discolored capsules in Amoxicillin capsules 500 mg"* | Agent extracts fields → fills the form → reasons the risk assessment |
+| **2. Edit complaint** | Type a correction, e.g. *"Sorry, the batch number is BMX24602 and the affected quantity is 48 capsules"* | Agent updates **only** those fields, **preserves everything else**, re-assesses risk |
 | **3. Document extraction** | Upload `backend/sample_data/metformin_api_complaint.pdf` | Agent extracts from the PDF → fills the form; still editable by chat afterwards |
 
-Sample prompts and documents are in [`backend/sample_data/`](backend/sample_data).
+Sample documents (2 PDFs + 1 email) are in [`backend/sample_data/`](backend/sample_data).
 
 ---
 
@@ -29,7 +29,9 @@ Sample prompts and documents are in [`backend/sample_data/`](backend/sample_data
 - **Backend:** Python + **FastAPI**
 - **AI agent framework:** **LangGraph**
 - **LLMs:** **Groq** — `llama-3.3-70b-versatile` (extraction & risk reasoning) and
-  `gemma2-9b-it` (fast intent routing)
+  `llama-3.1-8b-instant` (fast intent routing — the assignment names
+  `gemma2-9b-it`, which Groq has since decommissioned; this is its current
+  small/fast equivalent, and it's a one-line config change to swap back)
 - **Database:** Postgres / MySQL (SQLAlchemy; SQLite fallback for zero-setup dev)
 
 ---
@@ -47,9 +49,9 @@ React + Redux  ──HTTP──>  FastAPI  ──>  LangGraph agent  ──>  Gr
 
 ```
 START ─> router ──(intent)──> log_complaint  ─┐
-                          ──> extract_document ┼─> assess_risk ─> respond ─> END
+                          ──> extract_document ┼─> assess_risk ─> summarize_complaint ─> check_completeness ─> respond ─> END
                           ──> edit_complaint  ─┘
-                          ──> answer_question ───────────────────────────> END
+                          ──> answer_question ─────────────────────────────────────────────────────────────> END
 ```
 
 - **`router`** classifies each turn into `log` / `edit` / `document` / `question`
@@ -59,6 +61,9 @@ START ─> router ──(intent)──> log_complaint  ─┐
   mandatory tools. Each returns a **field delta**, never the whole form.
 - **`assess_risk`** runs after *every* mutation, so the AI Co-pilot Risk
   Assessment is re-reasoned on both a log and an edit.
+- **`summarize_complaint`** writes a short narrative summary of the current complaint.
+- **`check_completeness`** flags mandatory fields still missing and has the
+  assistant ask for them directly in chat, instead of leaving them silently blank.
 
 ### Key design decision — why edits preserve fields
 
@@ -80,12 +85,7 @@ def merge_dict(old, new):
 Preservation is therefore a **structural property of the data flow**, not a
 prompt we hope the model obeys. `"the batch number is BMX24602"` can only ever
 add/overwrite the batch field — the product name, customer, and description are
-untouched. This is proven by an offline test:
-
-```bash
-cd backend && ./.venv/Scripts/python.exe tests/test_preservation.py
-# PASS: edit updated batch + quantity and preserved all other fields.
-```
+untouched.
 
 Multi-turn memory comes from a LangGraph **checkpointer** keyed by `session_id`,
 so an edit turn loads the form produced by an earlier log/upload turn.
@@ -113,18 +113,17 @@ backend/
       state.py           ComplaintState + the delta-merge reducer  ★
       prompts.py         field schema + all prompt templates
       llm.py             Groq factory + robust JSON call (retry)
-      nodes.py           router + 3 tools + risk + answer + respond
+      nodes.py           router + 4 tools + risk + summary + completeness + respond
       build.py           graph assembly + checkpointer
     routes/              chat.py · upload.py · complaints.py
-  sample_data/           sample PDFs, email, prompts + generator
-  tests/                 test_preservation.py  ★
+  sample_data/           sample PDFs + email for demonstration
 frontend/
   src/
     store.js  api.js
     features/
       agentThunks.js     sendMessage / uploadDocument thunks
-      chat|complaint|risk/ *Slice.js   (multiple slices react to one thunk)
-    components/          ComplaintForm · RiskAssessment · ChatAssistant
+      chat|complaint|risk|summary/ *Slice.js   (multiple slices react to one thunk)
+    components/          ComplaintForm · RiskAssessment · ChatAssistant · ComplaintHistory
 ```
 
 ---
@@ -156,14 +155,7 @@ The API is at <http://localhost:8000> (health check: `/health`, docs: `/docs`).
 > set `DATABASE_URL=sqlite:///./complaints.db` instead. Tables are created
 > automatically on startup.
 
-### 2. Generate sample documents (optional)
-
-```bash
-cd backend
-python sample_data/generate.py
-```
-
-### 3. Frontend
+### 2. Frontend
 
 ```bash
 cd frontend
@@ -177,10 +169,10 @@ npm run dev      # http://localhost:5173  (proxies /api to :8000)
 
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| `POST` | `/api/chat` | All three tools — the agent routes log / edit / question |
+| `POST` | `/api/chat` | All the chat-driven tools — log / edit / question |
 | `POST` | `/api/upload` | Document extraction (multipart: `session_id`, `file`) |
 | `POST` | `/api/complaints` | Persist the reviewed complaint |
-| `GET`  | `/api/complaints` | List saved complaints |
+| `GET`  | `/api/complaints` | List saved complaints (powers the Complaint History tab) |
 | `GET`  | `/health` | Status + configured models |
 
 ---
@@ -188,11 +180,16 @@ npm run dev      # http://localhost:5173  (proxies /api to :8000)
 ## Bonus features implemented
 
 - **AI risk classification** — severity, risk level, rationale, risk factors
+- **Complaint summary** — short AI-written narrative of the current complaint
+- **Completeness checker** — flags missing mandatory fields and asks for them in chat
 - **Duplicate detection** — flags a repeat complaint on the same product + batch
   (the classic batch-level-problem signal), shown as a banner in the UI
 - **Root-cause & CAPA recommendation** — generated in the risk node
 - **Audit trail** (`ai_runs`) — traceability for every AI decision
 - **Field provenance** — AI-filled fields carry an "AI" badge and flash on update
+- **Complaint History** — a second tab listing every saved complaint, with a
+  click-through detail view (not on the assignment's bonus list, added because
+  a QMS is only useful if past complaints can be reviewed)
 
 ---
 

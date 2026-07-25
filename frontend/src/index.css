@@ -13,6 +13,8 @@
   --amber-bg: #fff8e6;
   --green: #1a8a5a;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 6px 24px rgba(16, 24, 40, 0.06);
+  --topbar-h: 66px;
+  --tabbar-h: 53px;
   font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
 
@@ -38,13 +40,43 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
   background: var(--blue-soft); padding: 5px 10px; border-radius: 20px;
 }
 
+/* ---- Tab bar ---- */
+.tabbar {
+  display: flex; gap: 4px; padding: 10px 28px 0; background: var(--card);
+  border-bottom: 1px solid var(--line); position: sticky; top: var(--topbar-h); z-index: 9;
+}
+.tab {
+  font: inherit; font-size: .85rem; font-weight: 600; color: var(--ink-soft);
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  padding: 10px 16px; cursor: pointer; border-radius: 8px 8px 0 0;
+}
+.tab:hover { background: var(--field-bg); color: var(--ink); }
+.tab--active { color: var(--blue); border-bottom-color: var(--blue); }
+
 /* ---- Layout ---- */
 .layout {
   display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px;
   padding: 22px; max-width: 1400px; margin: 0 auto; align-items: start;
 }
+.layout--single { grid-template-columns: 1fr; }
 .col { display: flex; flex-direction: column; gap: 20px; }
-@media (max-width: 940px) { .layout { grid-template-columns: 1fr; } }
+
+/* Left column (form + risk) scrolls with the page. Right column (assistant)
+   stays fixed in place below the topbar while the left side scrolls. */
+.col--right {
+  position: sticky;
+  top: calc(var(--topbar-h) + var(--tabbar-h) + 22px);
+  height: calc(100vh - var(--topbar-h) - var(--tabbar-h) - 44px);
+  /* Safety net: if the real header height ever drifts from the --topbar-h /
+     --tabbar-h estimate above, the panel scrolls instead of silently
+     clipping its bottom (disclaimer / send button) out of view. */
+  overflow-y: auto;
+}
+
+@media (max-width: 940px) {
+  .layout { grid-template-columns: 1fr; }
+  .col--right { position: static; height: auto; }
+}
 
 /* ---- Cards ---- */
 .card {
@@ -77,6 +109,10 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
   font-size: .6rem; font-weight: 700; letter-spacing: .04em; color: var(--blue);
   background: var(--blue-soft); padding: 1px 5px; border-radius: 4px;
 }
+.missing-badge {
+  font-size: .6rem; font-weight: 700; letter-spacing: .04em; color: #c0392b;
+  background: #fdeaea; padding: 1px 5px; border-radius: 4px;
+}
 .field-value {
   min-height: 40px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px;
   background: var(--field-bg); font-size: .88rem; color: var(--ink);
@@ -88,6 +124,9 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
 .field-value.changed {
   border-color: var(--blue); background: var(--blue-soft);
   animation: flash 1.4s ease-out;
+}
+.field-value.missing {
+  border-style: dashed; border-color: #f0b4b4; background: #fff6f6;
 }
 @keyframes flash {
   0% { box-shadow: 0 0 0 3px rgba(47, 107, 255, .28); }
@@ -101,8 +140,6 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line-soft);
 }
-.save-wrap { display: flex; align-items: center; gap: 12px; }
-.saved-note { font-size: .8rem; color: var(--green); font-weight: 600; }
 .btn { font: inherit; font-weight: 600; font-size: .85rem; border-radius: 9px; padding: 9px 16px; cursor: pointer; border: 1px solid transparent; }
 .btn--ghost { background: #fff; border-color: var(--line); color: var(--ink-soft); }
 .btn--ghost:hover { background: var(--field-bg); }
@@ -126,7 +163,13 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
 .chip { font-size: .78rem; background: var(--field-bg); border: 1px solid var(--line); padding: 4px 10px; border-radius: 16px; color: var(--ink-soft); }
 
 /* ---- Assistant ---- */
-.assistant-card { display: flex; flex-direction: column; min-height: 640px; }
+.assistant-card {
+  display: flex; flex-direction: column;
+  min-height: 640px;
+  /* min-height (not a hard height + overflow:hidden) so if the card's natural
+     content is ever taller than the panel, col--right's overflow-y:auto
+     reveals the rest by scrolling instead of clipping it away. */
+}
 .dropzone {
   margin-top: 16px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 22px;
   text-align: center; cursor: pointer; color: var(--ink-soft); transition: all .2s; background: var(--field-bg);
@@ -140,8 +183,9 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
 .chat-log {
   flex: 1; margin-top: 16px; padding: 14px; background: var(--field-bg);
   border: 1px solid var(--line); border-radius: 12px; overflow-y: auto;
-  display: flex; flex-direction: column; gap: 12px; min-height: 220px; max-height: 46vh;
+  display: flex; flex-direction: column; gap: 12px; min-height: 220px;
 }
+@media (max-width: 940px) { .chat-log { max-height: 46vh; } }
 .msg { display: flex; gap: 8px; align-items: flex-start; }
 .msg--user { flex-direction: row-reverse; }
 .msg-avatar { font-size: 1.1rem; flex-shrink: 0; }
@@ -166,3 +210,40 @@ h2 { font-size: 1.05rem; margin: 0; font-weight: 600; }
 .send-btn { width: 44px; border: none; border-radius: 10px; background: var(--blue); color: #fff; font-size: 1rem; cursor: pointer; }
 .send-btn:disabled { opacity: .5; cursor: not-allowed; }
 .disclaimer { font-size: .72rem; color: var(--muted); text-align: center; margin: 10px 0 0; }
+
+/* ---- Complaint History ---- */
+.history-card { max-width: 1400px; margin: 0 auto; }
+.table-wrap { margin-top: 16px; overflow-x: auto; }
+.history-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.history-table th {
+  text-align: left; font-size: .72rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted); padding: 10px 12px;
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+.history-table td {
+  padding: 11px 12px; border-bottom: 1px solid var(--line-soft); color: var(--ink);
+  white-space: nowrap;
+}
+.history-row { cursor: pointer; }
+.history-row:hover { background: var(--field-bg); }
+
+/* ---- Complaint detail modal ---- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(16, 24, 40, 0.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 20px; overflow-y: auto; z-index: 100;
+}
+.modal {
+  background: var(--card); border-radius: 14px; max-width: 900px; width: 100%;
+  padding: 24px 26px; box-shadow: var(--shadow);
+}
+.modal-head {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 4px;
+}
+.modal fieldset { border: none; padding: 0; margin: 18px 0 0; }
+.modal legend {
+  font-size: .74rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink-soft); padding-bottom: 10px; margin-bottom: 4px; width: 100%;
+  border-bottom: 1px solid var(--line-soft);
+}

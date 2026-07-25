@@ -46,6 +46,8 @@ class Complaint(Base):
 
     # AI co-pilot risk assessment (reasoned, stored as JSON snapshot)
     risk_assessment: Mapped[dict | None] = mapped_column(JSON)
+    # AI-generated narrative summary (bonus tool: summarize_complaint)
+    summary: Mapped[str | None] = mapped_column(Text)
 
     status: Mapped[str] = mapped_column(String(40), default="Pending Triage")
     created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=_utcnow)

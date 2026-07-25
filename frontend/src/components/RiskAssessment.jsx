@@ -10,6 +10,7 @@ function sevClass(severity) {
 
 export default function RiskAssessment() {
   const risk = useSelector((s) => s.risk.data);
+  const summary = useSelector((s) => s.summary.text);
   const hasRisk = risk.severity || risk.next_action || risk.rationale;
 
   return (
@@ -28,6 +29,12 @@ export default function RiskAssessment() {
 
       {hasRisk && (
         <div className="risk-body">
+          {summary && (
+            <div className="risk-block">
+              <span className="risk-label">Complaint Summary</span>
+              <p>{summary}</p>
+            </div>
+          )}
           <div className="risk-row">
             <span className="risk-label">Risk Level</span>
             <span className="risk-val">{risk.risk_level || "—"}</span>

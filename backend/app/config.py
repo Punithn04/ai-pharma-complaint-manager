@@ -9,7 +9,9 @@ class Settings(BaseSettings):
 
     groq_api_key: str = ""
     groq_extraction_model: str = "llama-3.3-70b-versatile"
-    groq_fast_model: str = "gemma2-9b-it"
+    # gemma2-9b-it (named in the assignment) was decommissioned by Groq;
+    # llama-3.1-8b-instant is the current small/fast equivalent.
+    groq_fast_model: str = "llama-3.1-8b-instant"
 
     database_url: str = "sqlite:///./complaints.db"
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
