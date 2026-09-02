@@ -1,4 +1,4 @@
-# AIVOA — AI-Powered Customer Complaint Management System
+# AI-Powered Customer Complaint Management System
 
 A full-stack, agentic complaint-intake system for the **pharmaceutical
 manufacturing** industry (API & FDF Quality Management). An AI co-pilot reads a
@@ -7,11 +7,12 @@ structured QMS form, **reasons** about patient/quality risk, and stays editable
 through natural-language corrections — the human never types into the form
 directly.
 
-Built for the AIVOA Round-1 Full-Stack assessment.
+A personal project exploring agentic AI workflows in a regulated,
+high-stakes domain.
 
 ---
 
-## Demo workflow (the three mandatory AI tools)
+## Demo workflow (the three core AI tools)
 
 | Tool | How to trigger | What happens |
 |------|----------------|--------------|
@@ -23,13 +24,13 @@ Sample documents (2 PDFs + 1 email) are in [`backend/sample_data/`](backend/samp
 
 ---
 
-## Tech stack (as mandated)
+## Tech stack
 
 - **Frontend:** React + **Redux Toolkit** (Vite), Google **Inter** font
 - **Backend:** Python + **FastAPI**
 - **AI agent framework:** **LangGraph**
 - **LLMs:** **Groq** — `llama-3.3-70b-versatile` (extraction & risk reasoning) and
-  `llama-3.1-8b-instant` (fast intent routing — the assignment names
+  `llama-3.1-8b-instant` (fast intent routing — originally targeted
   `gemma2-9b-it`, which Groq has since decommissioned; this is its current
   small/fast equivalent, and it's a one-line config change to swap back)
 - **Database:** Postgres / MySQL (SQLAlchemy; SQLite fallback for zero-setup dev)
@@ -58,7 +59,7 @@ START ─> router ──(intent)──> log_complaint  ─┐
   (uploads always take the `document` path; a keyword fast-path catches
   corrections cheaply before falling back to the small model).
 - **`log_complaint` / `extract_document` / `edit_complaint`** are the three
-  mandatory tools. Each returns a **field delta**, never the whole form.
+  core tools. Each returns a **field delta**, never the whole form.
 - **`assess_risk`** runs after *every* mutation, so the AI Co-pilot Risk
   Assessment is re-reasoned on both a log and an edit.
 - **`summarize_complaint`** writes a short narrative summary of the current complaint.
@@ -188,15 +189,15 @@ npm run dev      # http://localhost:5173  (proxies /api to :8000)
 - **Audit trail** (`ai_runs`) — traceability for every AI decision
 - **Field provenance** — AI-filled fields carry an "AI" badge and flash on update
 - **Complaint History** — a second tab listing every saved complaint, with a
-  click-through detail view (not on the assignment's bonus list, added because
-  a QMS is only useful if past complaints can be reviewed)
+  click-through detail view, added because a QMS is only useful if past
+  complaints can be reviewed
 
 ---
 
 ## Notes & honest scope
 
-- OCR / production document parsing is intentionally out of scope (per the
-  assignment); only text-based PDFs and emails are parsed.
+- OCR / production document parsing is intentionally out of scope; only
+  text-based PDFs and emails are parsed.
 - The LangGraph checkpointer is in-memory (`MemorySaver`) — swap for a Postgres
   checkpointer to persist sessions across restarts.
 - Sample pharmaceutical data is fictional, for demonstration only.
